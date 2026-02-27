@@ -2,7 +2,7 @@ import os
 
 # Gemini API
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = 'gemini-3.1-pro'
+GEMINI_MODEL = 'gemini-2.5-pro'
 
 # Scraping
 REQUEST_TIMEOUT = 15
