@@ -44,13 +44,32 @@ function saveNotes(btn) {
 }
 
 
+// Analysis step messages
+const ANALYSIS_STEPS = [
+    '🔍 ページをスクレイピング中…',
+    '🖼️ OGP画像を取得中…',
+    '🧠 Gemini 3.1 Pro で分析中…',
+    '📐 建築情報を抽出中…',
+    '💾 データを保存中…',
+];
+
+function startStepAnimation(el) {
+    let step = 0;
+    el.innerHTML = `<span class="spinner"></span> ${ANALYSIS_STEPS[0]}`;
+    const interval = setInterval(() => {
+        step = (step + 1) % ANALYSIS_STEPS.length;
+        el.innerHTML = `<span class="spinner"></span> ${ANALYSIS_STEPS[step]}`;
+    }, 4000);
+    return interval;
+}
+
 /**
  * Analyze a work with Gemini AI
  */
 function analyzeWork(workId, btn) {
     btn.disabled = true;
     const originalText = btn.textContent;
-    btn.innerHTML = '<span class="spinner"></span> 分析中…';
+    const stepInterval = startStepAnimation(btn);
 
     fetch(`/analyze/${workId}`, {
         method: 'POST',
@@ -58,25 +77,21 @@ function analyzeWork(workId, btn) {
     })
         .then(res => res.json())
         .then(data => {
+            clearInterval(stepInterval);
             if (data.status === 'ok') {
-                btn.innerHTML = '✓ 分析完了';
+                btn.innerHTML = '✅ 分析完了！';
                 btn.classList.add('saved');
-                // Reload page after a short delay to show updated data
                 setTimeout(() => location.reload(), 1000);
             } else {
                 btn.textContent = 'エラー: ' + (data.message || '不明');
                 btn.disabled = false;
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                }, 3000);
+                setTimeout(() => { btn.innerHTML = originalText; }, 3000);
             }
         })
         .catch(err => {
+            clearInterval(stepInterval);
             btn.textContent = '通信エラー';
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }, 3000);
+            setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
         });
 }
 
@@ -290,23 +305,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Poll for auto-analysis completion
     if (autoAnalyze) {
         const workId = autoAnalyze.dataset.id;
+        let stepIdx = 0;
+        const stepInterval = setInterval(() => {
+            stepIdx = (stepIdx + 1) % ANALYSIS_STEPS.length;
+            autoAnalyze.innerHTML = `<span class="spinner"></span> ${ANALYSIS_STEPS[stepIdx]}`;
+        }, 4000);
+
         const pollInterval = setInterval(() => {
             fetch(`/status/${workId}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.is_analyzed) {
                         clearInterval(pollInterval);
-                        autoAnalyze.innerHTML = '✓ AI分析完了！';
+                        clearInterval(stepInterval);
+                        autoAnalyze.innerHTML = '✅ AI分析完了！';
                         autoAnalyze.classList.add('analyze-done');
                         setTimeout(() => location.reload(), 1500);
                     }
                 })
                 .catch(() => { });
-        }, 3000); // Poll every 3 seconds
+        }, 3000);
 
         // Stop polling after 2 minutes
         setTimeout(() => {
             clearInterval(pollInterval);
+            clearInterval(stepInterval);
             if (!autoAnalyze.classList.contains('analyze-done')) {
                 autoAnalyze.innerHTML = '⏳ 分析に時間がかかっています。ページをリロードしてください。';
             }
