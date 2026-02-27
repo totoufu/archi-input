@@ -42,7 +42,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/archi-input
 Environment="PATH=/opt/archi-input/venv/bin"
-ExecStart=/opt/archi-input/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 app:app
+ExecStart=/opt/archi-input/venv/bin/gunicorn --workers 2 --timeout 120 --bind 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=5
 
