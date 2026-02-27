@@ -27,7 +27,7 @@ def _get_client():
 
 def _call_gemini(prompt: str, image_data: bytes = None, image_mime: str = 'image/jpeg', max_retries: int = 3) -> str:
     """Call Gemini API with retry logic for rate limits. Optionally include an image."""
-    models_to_try = [config.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']
+    models_to_try = [config.GEMINI_MODEL, 'gemini-2.5-pro', 'gemini-2.5-flash']
     client = _get_client()
 
     # Build contents: text + optional image
