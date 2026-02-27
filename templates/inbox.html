@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Inbox – Archi Input{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Inbox</h1>
+    <p class="page-subtitle">作品名やURLを追加して、建築事例をストックしよう</p>
+</div>
+
+{% if request.args.get('error') %}
+<div class="alert alert-error">
+    <span class="alert-icon">⚠</span>
+    {{ request.args.get('error') }}
+</div>
+{% endif %}
+
+{% if request.args.get('success') %}
+<div class="alert alert-success">
+    <span class="alert-icon">✓</span>
+    追加しました！
+    {% if request.args.get('analyzing') %}
+    <span class="analyzing-indicator" id="auto-analyze-status" data-id="{{ request.args.get('analyzing') }}">
+        <span class="spinner"></span> AI分析中…
+    </span>
+    {% endif %}
+</div>
+{% endif %}
+
+<form action="{{ url_for('add_work') }}" method="POST" class="inbox-form">
+    <div class="form-group">
+        <label for="title">作品名</label>
+        <input type="text" id="title" name="title" placeholder="例：光の教会" class="form-input" autocomplete="off">
+    </div>
+    <div class="form-group">
+        <label for="url">URL</label>
+        <input type="url" id="url" name="url" placeholder="https://..." class="form-input" autocomplete="off">
+    </div>
+    <button type="submit" class="btn btn-primary">
+        <span class="btn-icon">+</span>
+        追加
+    </button>
+</form>
+
+{% if recent %}
+<div class="recent-section">
+    <h2 class="section-title">最近の追加</h2>
+    <div class="recent-list">
+        {% for work in recent %}
+        <div class="recent-item" id="recent-{{ work.id }}">
+            <div class="recent-item-info">
+                <div class="recent-item-top">
+                    <span class="recent-title">{{ work.title or '(無題)' }}</span>
+                    {% if work.is_analyzed %}
+                    <span class="badge badge-analyzed">分析済</span>
+                    {% endif %}
+                </div>
+                {% if work.url %}
+                <a href="{{ work.url }}" target="_blank" rel="noopener" class="recent-url">{{ work.url[:60] }}{% if
+                    work.url|length > 60 %}…{% endif %}</a>
+                {% endif %}
+                {% if work.is_analyzed and work.architect %}
+                <span class="recent-meta">{{ work.architect }}{% if work.year %} · {{ work.year }}{% endif %}{% if
+                    work.country %} · {{ work.country }}{% endif %}</span>
+                {% endif %}
+            </div>
+            <div class="recent-item-actions">
+                {% if not work.is_analyzed %}
+                <button class="btn btn-ai btn-sm" onclick="analyzeWork({{ work.id }}, this)" title="AI分析">
+                    🤖 分析
+                </button>
+                {% endif %}
+                <span class="recent-date">{{ work.created_at.strftime('%m/%d %H:%M') if work.created_at else ''
+                    }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

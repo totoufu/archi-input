@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Report – Archi Input{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Report</h1>
+    <p class="page-subtitle">建築事例の偏り分析とAIレポート</p>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ total }}</div>
+        <div class="stat-label">総登録数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ analyzed }}</div>
+        <div class="stat-label">AI分析済</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ total - analyzed }}</div>
+        <div class="stat-label">未分析</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ countries|length }}</div>
+        <div class="stat-label">カバー国数</div>
+    </div>
+</div>
+
+{% if analyzed > 0 %}
+<!-- Distribution Charts -->
+<div class="charts-section">
+    <div class="chart-card">
+        <h3 class="chart-title">🌍 国別分布</h3>
+        <div class="chart-bars">
+            {% for country, count in countries.items() %}
+            <div class="chart-row">
+                <span class="chart-label">{{ country }}</span>
+                <div class="chart-bar-wrapper">
+                    <div class="chart-bar bar-country" style="width: {{ (count / total * 100)|round }}%"></div>
+                </div>
+                <span class="chart-value">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <h3 class="chart-title">🏢 用途別分布</h3>
+        <div class="chart-bars">
+            {% for usage, count in usages.items() %}
+            <div class="chart-row">
+                <span class="chart-label">{{ usage }}</span>
+                <div class="chart-bar-wrapper">
+                    <div class="chart-bar bar-usage" style="width: {{ (count / total * 100)|round }}%"></div>
+                </div>
+                <span class="chart-value">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <h3 class="chart-title">🔩 構造別分布</h3>
+        <div class="chart-bars">
+            {% for struct, count in structures.items() %}
+            <div class="chart-row">
+                <span class="chart-label">{{ struct }}</span>
+                <div class="chart-bar-wrapper">
+                    <div class="chart-bar bar-structure" style="width: {{ (count / total * 100)|round }}%"></div>
+                </div>
+                <span class="chart-value">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <h3 class="chart-title">📅 年代別分布</h3>
+        <div class="chart-bars">
+            {% for decade, count in decades.items() %}
+            <div class="chart-row">
+                <span class="chart-label">{{ decade }}s</span>
+                <div class="chart-bar-wrapper">
+                    <div class="chart-bar bar-decade" style="width: {{ (count / total * 100)|round }}%"></div>
+                </div>
+                <span class="chart-value">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- AI Report Generation -->
+<div class="report-section">
+    <h2 class="section-title">🤖 AIレポート</h2>
+    <p class="report-description">Gemini AIがあなたの建築インプットを分析し、偏りやおすすめを提案します</p>
+    <div class="form-group">
+        <label for="report-prompt">分析の指示（任意）</label>
+        <textarea id="report-prompt" class="form-input report-prompt-input"
+            placeholder="例：&#10;・構造の観点から比較分析してほしい&#10;・コルビュジエの作品を中心に考察して&#10;・公共建築のあり方について論じて&#10;・空欄なら標準レポートを生成します"
+            rows="3"></textarea>
+    </div>
+    <button class="btn btn-primary btn-lg" id="generate-report-btn" onclick="generateReport()">
+        📊 レポートを生成する
+    </button>
+    <div id="report-output" class="report-output" style="display:none;"></div>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📊</div>
+    <p>AI分析済みの作品がまだありません</p>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">LibraryまたはInboxから作品を「🤖 分析」してみてください</p>
+</div>
+{% endif %}
+{% endblock %}

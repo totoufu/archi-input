@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Today – Archi Input{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Today</h1>
+    <p class="page-subtitle">今日の建築事例をインプットしよう</p>
+</div>
+
+{% if empty %}
+<div class="empty-state">
+    <div class="empty-icon">📐</div>
+    <p>まだ作品が登録されていません</p>
+    <a href="{{ url_for('inbox') }}" class="btn btn-primary">Inboxで追加する</a>
+</div>
+{% else %}
+
+{% if main_picks %}
+<div class="today-section">
+    <h2 class="section-title">
+        <span class="section-badge main-badge">3</span>
+        今日の事例
+    </h2>
+    <div class="card-grid">
+        {% for work in main_picks %}
+        <div class="work-card" data-id="{{ work.id }}">
+            {% if work.thumbnail_url %}
+            <div class="card-thumbnail">
+                <img src="{{ work.thumbnail_url }}" alt="{{ work.title }}"
+                    onerror="this.parentElement.style.display='none'">
+            </div>
+            {% endif %}
+            <div class="card-header">
+                <h3 class="card-title">{{ work.title or '(無題)' }}</h3>
+                {% if work.url %}
+                <a href="{{ work.url }}" target="_blank" rel="noopener" class="card-link" title="サイトを開く">↗</a>
+                {% endif %}
+            </div>
+            {% if work.is_analyzed %}
+            <div class="card-tags">
+                {% if work.architect %}<span class="tag tag-architect">{{ work.architect }}</span>{% endif %}
+                {% if work.year %}<span class="tag tag-year">{{ work.year }}</span>{% endif %}
+                {% if work.country %}<span class="tag tag-country">{{ work.country }}{% if work.city %} · {{ work.city
+                    }}{% endif %}</span>{% endif %}
+                {% if work.usage %}<span class="tag tag-usage">{{ work.usage }}</span>{% endif %}
+                {% if work.structure %}<span class="tag tag-structure">{{ work.structure }}</span>{% endif %}
+            </div>
+            {% if work.ai_description %}
+            <p class="card-description">{{ work.ai_description }}</p>
+            {% endif %}
+            {% else %}
+            <button class="btn btn-ai btn-sm" onclick="analyzeWork({{ work.id }}, this)" style="margin-top:0.5rem">🤖
+                AI分析する</button>
+            {% endif %}
+            {% if work.url %}
+            <p class="card-url">{{ work.url[:50] }}{% if work.url|length > 50 %}…{% endif %}</p>
+            {% endif %}
+            <div class="card-notes">
+                <textarea class="notes-input" placeholder="30秒メモを残す…"
+                    data-id="{{ work.id }}">{{ work.notes }}</textarea>
+                <button class="btn btn-save" onclick="saveNotes(this)" data-id="{{ work.id }}">保存</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if bonus %}
+<div class="today-section">
+    <h2 class="section-title">
+        <span class="section-badge bonus-badge">+1</span>
+        ボーナス（復習）
+    </h2>
+    <div class="card-grid">
+        <div class="work-card bonus-card" data-id="{{ bonus.id }}">
+            {% if bonus.thumbnail_url %}
+            <div class="card-thumbnail">
+                <img src="{{ bonus.thumbnail_url }}" alt="{{ bonus.title }}"
+                    onerror="this.parentElement.style.display='none'">
+            </div>
+            {% endif %}
+            <div class="card-header">
+                <h3 class="card-title">{{ bonus.title or '(無題)' }}</h3>
+                {% if bonus.url %}
+                <a href="{{ bonus.url }}" target="_blank" rel="noopener" class="card-link" title="サイトを開く">↗</a>
+                {% endif %}
+            </div>
+            {% if bonus.is_analyzed %}
+            <div class="card-tags">
+                {% if bonus.architect %}<span class="tag tag-architect">{{ bonus.architect }}</span>{% endif %}
+                {% if bonus.year %}<span class="tag tag-year">{{ bonus.year }}</span>{% endif %}
+                {% if bonus.country %}<span class="tag tag-country">{{ bonus.country }}</span>{% endif %}
+                {% if bonus.usage %}<span class="tag tag-usage">{{ bonus.usage }}</span>{% endif %}
+                {% if bonus.structure %}<span class="tag tag-structure">{{ bonus.structure }}</span>{% endif %}
+            </div>
+            {% endif %}
+            {% if bonus.notes %}
+            <p class="card-prev-notes">前回のメモ: {{ bonus.notes }}</p>
+            {% endif %}
+            <div class="card-notes">
+                <textarea class="notes-input" placeholder="新しいメモを残す…"
+                    data-id="{{ bonus.id }}">{{ bonus.notes }}</textarea>
+                <button class="btn btn-save" onclick="saveNotes(this)" data-id="{{ bonus.id }}">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

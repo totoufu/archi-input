@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Library – Archi Input{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Library</h1>
+    <p class="page-subtitle">登録済みの建築事例一覧</p>
+</div>
+
+<form action="{{ url_for('library') }}" method="GET" class="search-form">
+    <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" name="q" value="{{ query }}" placeholder="作品名・設計者・国・用途で検索…" class="search-input"
+            autocomplete="off">
+        {% if query %}
+        <a href="{{ url_for('library') }}" class="search-clear" title="クリア">✕</a>
+        {% endif %}
+    </div>
+</form>
+
+{% if works %}
+<div class="library-stats">
+    <span>{{ works|length }}件{% if query %} 見つかりました{% endif %}</span>
+</div>
+
+<div class="library-list">
+    {% for work in works %}
+    <div class="library-item" id="lib-{{ work.id }}">
+        <div class="library-item-main">
+            <div class="library-item-info">
+                <div class="library-title-row">
+                    <span class="library-title">{{ work.title or '(無題)' }}</span>
+                    {% if work.is_analyzed %}
+                    <span class="badge badge-analyzed">AI分析済</span>
+                    {% endif %}
+                </div>
+                {% if work.is_analyzed %}
+                <div class="library-tags">
+                    {% if work.architect %}<span class="tag tag-architect">{{ work.architect }}</span>{% endif %}
+                    {% if work.year %}<span class="tag tag-year">{{ work.year }}</span>{% endif %}
+                    {% if work.country %}<span class="tag tag-country">{{ work.country }}{% if work.city %} · {{
+                        work.city }}{% endif %}</span>{% endif %}
+                    {% if work.usage %}<span class="tag tag-usage">{{ work.usage }}</span>{% endif %}
+                    {% if work.structure %}<span class="tag tag-structure">{{ work.structure }}</span>{% endif %}
+                </div>
+                {% if work.ai_description %}
+                <p class="library-ai-desc">{{ work.ai_description }}</p>
+                {% endif %}
+                {% endif %}
+                {% if work.url %}
+                <a href="{{ work.url }}" target="_blank" rel="noopener" class="library-url">{{ work.url[:70] }}{% if
+                    work.url|length > 70 %}…{% endif %}</a>
+                {% endif %}
+            </div>
+            <div class="library-item-meta">
+                {% if work.is_reviewed %}
+                <span class="badge badge-reviewed">レビュー済</span>
+                {% else %}
+                <span class="badge badge-new">未読</span>
+                {% endif %}
+                <span class="library-date">{{ work.created_at.strftime('%Y/%m/%d') if work.created_at else '' }}</span>
+            </div>
+        </div>
+        <div class="library-item-notes">
+            <textarea class="notes-input notes-small" placeholder="メモ…"
+                data-id="{{ work.id }}">{{ work.notes }}</textarea>
+            <div class="library-item-actions">
+                <button class="btn btn-save btn-sm" onclick="saveNotes(this)" data-id="{{ work.id }}">保存</button>
+                {% if work.is_analyzed %}
+                <button class="btn btn-ai btn-sm" onclick="toggleDeepAnalysis({{ work.id }})">💬 深掘り</button>
+                {% else %}
+                <button class="btn btn-ai btn-sm" onclick="analyzeWork({{ work.id }}, this)">🤖 分析</button>
+                {% endif %}
+                <form action="{{ url_for('delete_work', work_id=work.id) }}" method="POST" class="inline-form"
+                    onsubmit="return confirm('この作品を削除しますか？')">
+                    <button type="submit" class="btn btn-danger btn-sm">削除</button>
+                </form>
+            </div>
+        </div>
+        <!-- Deep analysis panel -->
+        <div class="deep-analysis-panel" id="deep-{{ work.id }}" style="display:none;">
+            <div class="deep-input-row">
+                <input type="text" class="form-input deep-prompt-input" id="deep-prompt-{{ work.id }}"
+                    placeholder="この作品について質問（例：空間構成の特徴は？他の教会建築との違いは？）">
+                <button class="btn btn-primary btn-sm" onclick="deepAnalyze({{ work.id }})">送信</button>
+            </div>
+            <div class="deep-output" id="deep-output-{{ work.id }}"></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📚</div>
+    {% if query %}
+    <p>「{{ query }}」に一致する作品はありません</p>
+    {% else %}
+    <p>まだ作品が登録されていません</p>
+    <a href="{{ url_for('inbox') }}" class="btn btn-primary">Inboxで追加する</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
