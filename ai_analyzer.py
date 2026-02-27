@@ -40,19 +40,31 @@ def _call_gemini(prompt: str, image_data: bytes = None, image_mime: str = 'image
         contents = prompt
 
     for model in models_to_try:
+        # 3.x models require thinking_config
+        if model.startswith('gemini-3'):
+            gen_config = genai_types.GenerateContentConfig(
+                thinking_config=genai_types.ThinkingConfig(thinking_level="HIGH"),
+            )
+        else:
+            gen_config = None
+
         for attempt in range(max_retries):
             try:
-                response = client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                )
+                kwargs = dict(model=model, contents=contents)
+                if gen_config:
+                    kwargs['config'] = gen_config
+                response = client.models.generate_content(**kwargs)
                 return response.text.strip()
             except genai_errors.ClientError as e:
-                if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
+                err_str = str(e)
+                if '429' in err_str or 'RESOURCE_EXHAUSTED' in err_str:
                     wait_time = (attempt + 1) * 8
                     print(f'[AI] Rate limited on {model}, waiting {wait_time}s (attempt {attempt+1}/{max_retries})')
                     time.sleep(wait_time)
                     continue
+                elif '404' in err_str or 'not found' in err_str.lower():
+                    print(f'[AI] Model {model} not available, trying next...')
+                    break  # skip to next model
                 else:
                     raise
             except Exception:
