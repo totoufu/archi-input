@@ -1,12 +1,14 @@
 import os
 import random
 import threading
+import uuid
 from datetime import date, datetime, timezone
 from collections import Counter
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify
+from werkzeug.utils import secure_filename
 from models import db, Work
-from ai_analyzer import analyze_work, analyze_title_only, generate_report, deep_analyze
+from ai_analyzer import analyze_work, analyze_title_only, generate_report, deep_analyze, visual_analyze
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -20,6 +22,15 @@ os.makedirs(data_dir, exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(data_dir, 'app.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'archi-input-dev-key'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+
+# Upload directory
+upload_dir = os.path.join(basedir, 'static', 'uploads')
+os.makedirs(upload_dir, exist_ok=True)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 db.init_app(app)
 
@@ -40,6 +51,8 @@ with app.app_context():
         'ai_description': 'TEXT DEFAULT ""',
         'thumbnail_url': 'VARCHAR(2000) DEFAULT ""',
         'is_analyzed': 'BOOLEAN DEFAULT 0',
+        'image_path': 'VARCHAR(500) DEFAULT ""',
+        'visual_analysis': 'TEXT DEFAULT ""',
     }
     for col_name, col_type in new_columns.items():
         if col_name not in existing_cols and existing_cols:
@@ -147,6 +160,16 @@ def add_work():
         return redirect(url_for('inbox', error='作品名またはURLを入力してください'))
 
     work = Work(title=title, url=url)
+
+    # Handle image upload
+    image_file = request.files.get('image')
+    if image_file and image_file.filename and allowed_file(image_file.filename):
+        ext = image_file.filename.rsplit('.', 1)[1].lower()
+        unique_name = f'{uuid.uuid4().hex[:12]}.{ext}'
+        save_path = os.path.join(upload_dir, unique_name)
+        image_file.save(save_path)
+        work.image_path = f'uploads/{unique_name}'
+
     db.session.add(work)
     db.session.commit()
 
@@ -285,6 +308,46 @@ def deep_analyze_work(work_id):
 
     work_data = work.to_dict()
     result_text = deep_analyze(work_data, user_prompt)
+    return jsonify({'status': 'ok', 'result': result_text})
+
+
+@app.route('/visual_analyze/<int:work_id>', methods=['POST'])
+def visual_analyze_work(work_id):
+    """Run visual analysis on an uploaded image."""
+    work = Work.query.get_or_404(work_id)
+
+    # Determine image source: uploaded file or OG image URL
+    image_data = None
+    image_mime = 'image/jpeg'
+
+    if work.image_path:
+        img_path = os.path.join(basedir, 'static', work.image_path)
+        if os.path.exists(img_path):
+            with open(img_path, 'rb') as f:
+                image_data = f.read()
+            ext = work.image_path.rsplit('.', 1)[1].lower()
+            mime_map = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif'}
+            image_mime = mime_map.get(ext, 'image/jpeg')
+    elif work.thumbnail_url:
+        try:
+            import requests as req
+            resp = req.get(work.thumbnail_url, timeout=10)
+            resp.raise_for_status()
+            ct = resp.headers.get('Content-Type', 'image/jpeg').split(';')[0].strip()
+            if ct.startswith('image/'):
+                image_data = resp.content
+                image_mime = ct
+        except Exception:
+            pass
+
+    if not image_data:
+        return jsonify({'status': 'error', 'message': '画像が見つかりません'})
+
+    result_text = visual_analyze(image_data, image_mime, existing_title=work.title)
+    work.visual_analysis = result_text
+    work.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+
     return jsonify({'status': 'ok', 'result': result_text})
 
 

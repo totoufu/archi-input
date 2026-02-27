@@ -27,6 +27,10 @@ class Work(db.Model):
     thumbnail_url = db.Column(db.String(2000), default='')
     is_analyzed = db.Column(db.Boolean, default=False)
 
+    # --- Image & visual analysis ---
+    image_path = db.Column(db.String(500), default='')   # local file path
+    visual_analysis = db.Column(db.Text, default='')     # Gemini visual analysis
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -43,6 +47,8 @@ class Work(db.Model):
             'ai_description': self.ai_description,
             'thumbnail_url': self.thumbnail_url,
             'is_analyzed': self.is_analyzed,
+            'image_path': self.image_path,
+            'visual_analysis': self.visual_analysis,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

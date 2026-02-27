@@ -317,3 +317,33 @@ def deep_analyze(work_data: dict, user_prompt: str) -> str:
     except Exception as e:
         traceback.print_exc()
         return f'分析エラー: {str(e)}'
+
+
+def visual_analyze(image_data: bytes, image_mime: str = 'image/jpeg', existing_title: str = '') -> str:
+    """Analyze an architectural image visually using Gemini multimodal."""
+    context = f'（作品名: {existing_title}）' if existing_title else ''
+
+    prompt = f"""あなたは建築の専門家であり、建築写真の批評家です。
+以下の建築物の画像を詳しく分析してください。{context}
+
+## 分析してほしい観点
+1. **ファサード・外観**: 建物の正面性、開口部のリズム、立面構成
+2. **素材・テクスチャ**: 使用されている素材（コンクリート、ガラス、木、石、鉄骨等）とその質感
+3. **光と影**: 自然光の取り入れ方、影の演出、照明計画
+4. **プロポーション・スケール**: 建物の比例関係、人間との対比、ボリューム感
+5. **構造表現**: 構造体が外観にどう現れているか、構造と意匠の関係
+6. **周辺環境・ランドスケープ**: 周囲との関係性、アプローチ、配置計画
+7. **建築史的位置づけ**: どの建築様式・潮流に属するか、影響を受けた/与えた建築家
+
+## 出力ルール
+- 必ず日本語で、マークダウン形式で出力してください
+- 各観点に見出しをつけて構造的に記述してください
+- 専門用語を使いつつも、学習者にわかりやすく解説してください
+- 類似する他の建築作品にも言及してください
+- 500〜1000字程度を目安にしてください"""
+
+    try:
+        return _call_gemini(prompt, image_data=image_data, image_mime=image_mime)
+    except Exception as e:
+        traceback.print_exc()
+        return f'視覚分析エラー: {str(e)}'

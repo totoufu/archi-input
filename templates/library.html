@@ -27,6 +27,15 @@
     {% for work in works %}
     <div class="library-item" id="lib-{{ work.id }}">
         <div class="library-item-main">
+            {% if work.image_path %}
+            <div class="library-thumb">
+                <img src="{{ url_for('static', filename=work.image_path) }}" alt="{{ work.title }}">
+            </div>
+            {% elif work.thumbnail_url %}
+            <div class="library-thumb">
+                <img src="{{ work.thumbnail_url }}" alt="{{ work.title }}">
+            </div>
+            {% endif %}
             <div class="library-item-info">
                 <div class="library-title-row">
                     <span class="library-title">{{ work.title or '(無題)' }}</span>
@@ -68,6 +77,9 @@
                 <button class="btn btn-save btn-sm" onclick="saveNotes(this)" data-id="{{ work.id }}">保存</button>
                 {% if work.is_analyzed %}
                 <button class="btn btn-ai btn-sm" onclick="toggleDeepAnalysis({{ work.id }})">💬 深掘り</button>
+                {% if work.image_path or work.thumbnail_url %}
+                <button class="btn btn-ai btn-sm" onclick="visualAnalyze({{ work.id }}, this)">🖼️ 視覚分析</button>
+                {% endif %}
                 {% else %}
                 <button class="btn btn-ai btn-sm" onclick="analyzeWork({{ work.id }}, this)">🤖 分析</button>
                 {% endif %}
@@ -77,6 +89,15 @@
                 </form>
             </div>
         </div>
+        <!-- Visual analysis result -->
+        {% if work.visual_analysis %}
+        <div class="visual-analysis-result">
+            <h4 class="visual-title">🖼️ 視覚分析</h4>
+            <div class="visual-content report-content" id="visual-result-{{ work.id }}">{{ work.visual_analysis }}</div>
+        </div>
+        {% else %}
+        <div class="visual-analysis-result" id="visual-result-{{ work.id }}" style="display:none;"></div>
+        {% endif %}
         <!-- Deep analysis panel -->
         <div class="deep-analysis-panel" id="deep-{{ work.id }}" style="display:none;">
             <div class="deep-input-row">

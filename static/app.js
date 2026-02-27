@@ -152,6 +152,75 @@ function markdownToHtml(md) {
 
 
 /**
+ * Preview uploaded image
+ */
+function previewImage(input) {
+    const preview = document.getElementById('image-preview');
+    const img = document.getElementById('preview-img');
+    const label = document.getElementById('file-label');
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            img.src = e.target.result;
+            preview.style.display = 'flex';
+            label.style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function clearImage() {
+    const input = document.getElementById('image');
+    const preview = document.getElementById('image-preview');
+    const label = document.getElementById('file-label');
+    input.value = '';
+    preview.style.display = 'none';
+    label.style.display = 'flex';
+}
+
+
+/**
+ * Run visual analysis on a work's image
+ */
+function visualAnalyze(workId, btn) {
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 視覚分析中…';
+
+    const output = document.getElementById(`visual-result-${workId}`);
+
+    fetch(`/visual_analyze/${workId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                output.innerHTML = '<h4 class="visual-title">🖼️ 視覚分析</h4>' + markdownToHtml(data.result);
+                output.style.display = 'block';
+                btn.innerHTML = '✓ 視覚分析完了';
+                btn.classList.add('saved');
+            } else {
+                btn.textContent = 'エラー: ' + (data.message || '不明');
+            }
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('saved');
+                btn.disabled = false;
+            }, 3000);
+        })
+        .catch(() => {
+            btn.textContent = '通信エラー';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 3000);
+        });
+}
+
+
+/**
  * Toggle deep analysis panel for a work
  */
 function toggleDeepAnalysis(workId) {

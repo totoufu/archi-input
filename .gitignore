@@ -16,6 +16,9 @@ env/
 data/
 *.db
 
+# Uploads
+static/uploads/
+
 # IDE
 .vscode/
 .idea/
