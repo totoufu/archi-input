@@ -149,32 +149,10 @@ def report():
 
 
 # ---------------------------------------------------------------------------
-# Routes – Actions
+# Helper – Background AI analysis
 # ---------------------------------------------------------------------------
-@app.route('/add', methods=['POST'])
-def add_work():
-    title = request.form.get('title', '').strip()
-    url = request.form.get('url', '').strip()
-
-    if not title and not url:
-        return redirect(url_for('inbox', error='作品名またはURLを入力してください'))
-
-    work = Work(title=title, url=url)
-
-    # Handle image upload
-    image_file = request.files.get('image')
-    if image_file and image_file.filename and allowed_file(image_file.filename):
-        ext = image_file.filename.rsplit('.', 1)[1].lower()
-        unique_name = f'{uuid.uuid4().hex[:12]}.{ext}'
-        save_path = os.path.join(upload_dir, unique_name)
-        image_file.save(save_path)
-        work.image_path = f'uploads/{unique_name}'
-
-    db.session.add(work)
-    db.session.commit()
-
-    # Auto-analyze in background thread
-    work_id = work.id
+def start_bg_analysis(work_id):
+    """Start background AI analysis for a work."""
     def bg_analyze():
         with app.app_context():
             w = Work.query.get(work_id)
@@ -209,7 +187,98 @@ def add_work():
     thread = threading.Thread(target=bg_analyze, daemon=True)
     thread.start()
 
-    return redirect(url_for('inbox', success='1', analyzing=work_id))
+
+def _is_url(text):
+    """Check if text looks like a URL."""
+    return text.startswith(('http://', 'https://', 'www.'))
+
+
+# ---------------------------------------------------------------------------
+# Routes – Actions
+# ---------------------------------------------------------------------------
+@app.route('/add', methods=['POST'])
+def add_work():
+    # Smart input: single field auto-detects URL vs title
+    smart_input = request.form.get('input', '').strip()
+    title = request.form.get('title', '').strip()
+    url = request.form.get('url', '').strip()
+
+    # If smart input is provided, auto-detect
+    if smart_input and not title and not url:
+        if _is_url(smart_input):
+            url = smart_input if smart_input.startswith('http') else 'https://' + smart_input
+        else:
+            title = smart_input
+
+    if not title and not url:
+        return redirect(url_for('inbox', error='作品名またはURLを入力してください'))
+
+    work = Work(title=title, url=url)
+
+    # Handle image upload
+    image_file = request.files.get('image')
+    if image_file and image_file.filename and allowed_file(image_file.filename):
+        ext = image_file.filename.rsplit('.', 1)[1].lower()
+        unique_name = f'{uuid.uuid4().hex[:12]}.{ext}'
+        save_path = os.path.join(upload_dir, unique_name)
+        image_file.save(save_path)
+        work.image_path = f'uploads/{unique_name}'
+
+    db.session.add(work)
+    db.session.commit()
+
+    start_bg_analysis(work.id)
+
+    return redirect(url_for('inbox', success='1', analyzing=work.id))
+
+
+@app.route('/bulk_add', methods=['POST'])
+def bulk_add():
+    """Add multiple works from a text block (one URL or title per line)."""
+    text = request.form.get('bulk_input', '').strip()
+    if not text:
+        return redirect(url_for('inbox', error='テキストを入力してください'))
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    added = 0
+    for line in lines[:20]:  # Max 20 at once
+        if _is_url(line):
+            url = line if line.startswith('http') else 'https://' + line
+            work = Work(url=url)
+        else:
+            work = Work(title=line)
+        db.session.add(work)
+        db.session.commit()
+        start_bg_analysis(work.id)
+        added += 1
+
+    return redirect(url_for('inbox', success='1', bulk_count=added))
+
+
+@app.route('/quick_add')
+def quick_add():
+    """Bookmarklet endpoint – register current page via GET request."""
+    url = request.args.get('url', '').strip()
+    title = request.args.get('title', '').strip()
+
+    if not url:
+        return '<html><body><script>window.close();</script><p>URLが指定されていません</p></body></html>'
+
+    # Check for duplicates
+    existing = Work.query.filter_by(url=url).first()
+    if existing:
+        return f'''<html><head><meta charset="utf-8"><style>body{{font-family:sans-serif;text-align:center;padding:40px;background:#1a1a2e;color:#fff}}</style></head>
+        <body><h2>⚠️ 既に登録済みです</h2><p>{existing.title or url[:60]}</p>
+        <script>setTimeout(()=>window.close(),2000)</script></body></html>'''
+
+    work = Work(title=title, url=url)
+    db.session.add(work)
+    db.session.commit()
+    start_bg_analysis(work.id)
+
+    return f'''<html><head><meta charset="utf-8"><style>body{{font-family:sans-serif;text-align:center;padding:40px;background:#1a1a2e;color:#fff}}h2{{color:#a78bfa}}</style></head>
+    <body><h2>✅ 登録しました！</h2><p>{title or url[:60]}</p><p style="color:#888">AI分析を開始しました…</p>
+    <script>setTimeout(()=>window.close(),2000)</script></body></html>'''
 
 
 @app.route('/update_notes', methods=['POST'])

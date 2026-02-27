@@ -313,3 +313,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 120000);
     }
 });
+
+
+/**
+ * Toggle bulk input panel
+ */
+function toggleBulk() {
+    const panel = document.getElementById('bulk-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}

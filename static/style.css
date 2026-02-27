@@ -1286,3 +1286,92 @@ body::before {
         transform: translateY(0);
     }
 }
+
+/* --- Smart Input --- */
+.form-input-large {
+    font-size: 1rem !important;
+    padding: 0.8rem 1rem !important;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* --- Bulk Input --- */
+.bulk-section {
+    margin-top: 1rem;
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.bulk-panel {
+    margin-top: 0.8rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+.bulk-textarea {
+    min-height: 120px;
+    resize: vertical;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    font-family: monospace;
+}
+
+/* --- Bookmarklet --- */
+.bookmarklet-section {
+    margin-top: 2rem;
+    padding: 1.2rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.bookmarklet-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.8rem;
+}
+
+.bookmarklet-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.bookmarklet-btn {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, #7c3aed, #a78bfa);
+    color: #fff !important;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: grab;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.bookmarklet-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px hsla(250, 70%, 50%, 0.3);
+}
+
+.bookmarklet-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
