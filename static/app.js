@@ -44,23 +44,36 @@ function saveNotes(btn) {
 }
 
 
-// Analysis step messages
-const ANALYSIS_STEPS = [
-    '🔍 ページをスクレイピング中…',
-    '🖼️ OGP画像を取得中…',
-    '🧠 Gemini 3.1 Pro で分析中…',
-    '📐 建築情報を抽出中…',
-    '💾 データを保存中…',
-];
+// Remove dummy animation steps as we stream realtime now
+function startRealtimeStream(workId, containerEl) {
+    const eventSource = new EventSource(`/stream_status/${workId}`);
 
-function startStepAnimation(el) {
-    let step = 0;
-    el.innerHTML = `<span class="spinner"></span> ${ANALYSIS_STEPS[0]}`;
-    const interval = setInterval(() => {
-        step = (step + 1) % ANALYSIS_STEPS.length;
-        el.innerHTML = `<span class="spinner"></span> ${ANALYSIS_STEPS[step]}`;
-    }, 4000);
-    return interval;
+    // Create a log container if not exists
+    let logEl = containerEl.querySelector('.ai-stream-log');
+    if (!logEl) {
+        logEl = document.createElement('div');
+        logEl.className = 'ai-stream-log';
+        containerEl.appendChild(logEl);
+    }
+    logEl.style.display = 'block';
+
+    eventSource.onmessage = function (event) {
+        if (event.data === '[[DONE]]') {
+            eventSource.close();
+            return;
+        }
+
+        // Append streamed text (already has <br> from backend)
+        logEl.innerHTML += event.data;
+        // Scroll to bottom
+        logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    eventSource.onerror = function () {
+        eventSource.close();
+    };
+
+    return eventSource;
 }
 
 /**
@@ -69,7 +82,11 @@ function startStepAnimation(el) {
 function analyzeWork(workId, btn) {
     btn.disabled = true;
     const originalText = btn.textContent;
-    const stepInterval = startStepAnimation(btn);
+    btn.innerHTML = '<span class="spinner"></span> 分析中...';
+
+    // Parent container to hold the streaming log
+    const container = btn.closest('.recent-item, .library-item');
+    const stream = startRealtimeStream(workId, container);
 
     fetch(`/analyze/${workId}`, {
         method: 'POST',
@@ -77,11 +94,10 @@ function analyzeWork(workId, btn) {
     })
         .then(res => res.json())
         .then(data => {
-            clearInterval(stepInterval);
             if (data.status === 'ok') {
                 btn.innerHTML = '✅ 分析完了！';
                 btn.classList.add('saved');
-                setTimeout(() => location.reload(), 1000);
+                setTimeout(() => location.reload(), 1500);
             } else {
                 btn.textContent = 'エラー: ' + (data.message || '不明');
                 btn.disabled = false;
@@ -89,7 +105,7 @@ function analyzeWork(workId, btn) {
             }
         })
         .catch(err => {
-            clearInterval(stepInterval);
+            stream.close();
             btn.textContent = '通信エラー';
             setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
         });
@@ -302,14 +318,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 4000);
     });
 
-    // Poll for auto-analysis completion
+    // Poll for auto-analysis completion (Inbox background task)
     if (autoAnalyze) {
         const workId = autoAnalyze.dataset.id;
-        let stepIdx = 0;
-        const stepInterval = setInterval(() => {
-            stepIdx = (stepIdx + 1) % ANALYSIS_STEPS.length;
-            autoAnalyze.innerHTML = `<span class="spinner"></span> ${ANALYSIS_STEPS[stepIdx]}`;
-        }, 4000);
+
+        // Start SSE stream for the status alert box
+        autoAnalyze.innerHTML = '<span class="spinner"></span> 分析中...';
+        const stream = startRealtimeStream(workId, alert);
 
         const pollInterval = setInterval(() => {
             fetch(`/status/${workId}`)
@@ -317,10 +332,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then(data => {
                     if (data.is_analyzed) {
                         clearInterval(pollInterval);
-                        clearInterval(stepInterval);
+                        stream.close();
                         autoAnalyze.innerHTML = '✅ AI分析完了！';
                         autoAnalyze.classList.add('analyze-done');
-                        setTimeout(() => location.reload(), 1500);
+                        setTimeout(() => location.reload(), 2000);
                     }
                 })
                 .catch(() => { });
@@ -329,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Stop polling after 2 minutes
         setTimeout(() => {
             clearInterval(pollInterval);
-            clearInterval(stepInterval);
+            stream.close();
             if (!autoAnalyze.classList.contains('analyze-done')) {
                 autoAnalyze.innerHTML = '⏳ 分析に時間がかかっています。ページをリロードしてください。';
             }

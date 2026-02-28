@@ -25,7 +25,7 @@ def _get_client():
     return _client
 
 
-def _call_gemini(prompt: str, image_data: bytes = None, image_mime: str = 'image/jpeg', max_retries: int = 3) -> str:
+def _call_gemini(prompt: str, image_data: bytes = None, image_mime: str = 'image/jpeg', max_retries: int = 3, progress_callback=None) -> str:
     """Call Gemini API with retry logic for rate limits. Optionally include an image."""
     models_to_try = [config.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash']
     client = _get_client()
@@ -53,13 +53,22 @@ def _call_gemini(prompt: str, image_data: bytes = None, image_mime: str = 'image
                 kwargs = dict(model=model, contents=contents)
                 if gen_config:
                     kwargs['config'] = gen_config
-                response = client.models.generate_content(**kwargs)
-                return response.text.strip()
+                
+                # Stream the response for real-time progress
+                full_text = ""
+                for chunk in client.models.generate_content_stream(**kwargs):
+                    if chunk.text:
+                        full_text += chunk.text
+                        if progress_callback:
+                            progress_callback(chunk.text)
+                return full_text.strip()
             except genai_errors.ClientError as e:
                 err_str = str(e)
                 if '429' in err_str or 'RESOURCE_EXHAUSTED' in err_str:
                     wait_time = (attempt + 1) * 8
-                    print(f'[AI] Rate limited on {model}, waiting {wait_time}s (attempt {attempt+1}/{max_retries})')
+                    msg = f'[AI] Rate limited on {model}, waiting {wait_time}s (attempt {attempt+1}/{max_retries})'
+                    print(msg)
+                    if progress_callback: progress_callback(f"\n⏳ 待機中... ({wait_time}秒)\n")
                     time.sleep(wait_time)
                     continue
                 elif '404' in err_str or 'not found' in err_str.lower():
@@ -202,9 +211,11 @@ REPORT_PROMPT = """あなたは建築教育の専門家です。以下は、ユ�
 - 1500文字以上を目安にしてください"""
 
 
-def analyze_work(url: str, existing_title: str = '') -> dict:
+def analyze_work(url: str, existing_title: str = '', progress_callback=None) -> dict:
     """Analyze a URL and return structured architectural data."""
+    if progress_callback: progress_callback("🔍 Webページから情報を取得しに行きます...\n")
     scraped = scrape_url(url) if url else {}
+    if progress_callback: progress_callback(f"✅ タイトル: {scraped.get('page_title', existing_title)[:20]}...\n🧠 AIにデータを送信して分析を開始します...\n\n")
 
     # Build prompt
     prompt = ANALYZE_PROMPT.format(
@@ -219,6 +230,7 @@ def analyze_work(url: str, existing_title: str = '') -> dict:
             prompt,
             image_data=scraped.get('og_image_data'),
             image_mime=scraped.get('og_image_mime', 'image/jpeg'),
+            progress_callback=progress_callback
         )
 
         raw = raw_response
@@ -241,6 +253,7 @@ def analyze_work(url: str, existing_title: str = '') -> dict:
         }
     except Exception as e:
         traceback.print_exc()
+        if progress_callback: progress_callback(f"\n❌ エラーが発生しました: {e}\n")
         return {
             'error': str(e),
             'title': scraped.get('og_title') or scraped.get('page_title') or existing_title,
@@ -263,27 +276,19 @@ def generate_report(works_data: list, custom_prompt: str = '') -> str:
         return f'レポート生成エラー: {str(e)}'
 
 
-def analyze_title_only(title: str) -> dict:
+def analyze_title_only(title: str, progress_callback=None) -> dict:
     """Analyze a work by title alone (no URL)."""
-    prompt = f"""あなたは建築の専門家です。「{title}」という建築作品について知っている情報をJSON形式で返してください。
-
-## 出力JSON形式
-```json
-{{
-  "title": "作品名（正式名称）",
-  "architect": "設計者",
-  "year": 竣工年（数値、不明なら null）,
-  "country": "所在国",
-  "city": "所在都市",
-  "usage": "用途",
-  "structure": "構造種別",
-  "description": "特徴を200〜400字程度で詳しく説明（設計意図、空間構成、素材、歴史的意義など）"
-}}
-```
-JSONのみを返してください。必ず日本語で。"""
+    if progress_callback: progress_callback("🧠 URLがないため、作品名のみでAI分析を開始します...\n\n")
+    prompt = ANALYZE_PROMPT.format(
+        page_title=title,
+        og_title='',
+        og_description='',
+        text='この建築作品についての一般的な情報を分析し、概要を埋めてください。'
+    )
 
     try:
-        raw = _call_gemini(prompt)
+        raw_response = _call_gemini(prompt, progress_callback=progress_callback)
+        raw = raw_response
         raw = re.sub(r'^```(?:json)?\s*', '', raw)
         raw = re.sub(r'\s*```$', '', raw)
         data = json.loads(raw)
@@ -301,6 +306,7 @@ JSONのみを返してください。必ず日本語で。"""
         }
     except Exception as e:
         traceback.print_exc()
+        if progress_callback: progress_callback(f"\n❌ エラーが発生しました: {e}\n")
         return {'error': str(e), 'title': title}
 
 

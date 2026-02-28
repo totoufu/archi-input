@@ -158,14 +158,21 @@ def start_bg_analysis(work_id):
             w = Work.query.get(work_id)
             if not w:
                 return
+            
+            analysis_progress[work_id] = ""
+            def update_progress(text):
+                analysis_progress[work_id] = analysis_progress.get(work_id, "") + text
+
             try:
                 if w.url:
-                    result = analyze_work(w.url, w.title)
+                    result = analyze_work(w.url, w.title, progress_callback=update_progress)
                 elif w.title:
-                    result = analyze_title_only(w.title)
+                    result = analyze_title_only(w.title, progress_callback=update_progress)
                 else:
+                    update_progress("[[DONE]]")
                     return
                 if 'error' not in result:
+                    update_progress("\n✅ 分析完了！データベースに保存します...\n[[DONE]]")
                     w.title = result.get('title') or w.title
                     w.architect = result.get('architect', '')
                     w.year = result.get('year')
@@ -180,8 +187,10 @@ def start_bg_analysis(work_id):
                     db.session.commit()
                     print(f'[AI] Auto-analysis complete for work #{work_id}: {w.title}')
                 else:
+                    update_progress(f"\n❌ エラー終了: {result['error']}\n[[DONE]]")
                     print(f'[AI] Auto-analysis failed for work #{work_id}: {result["error"]}')
             except Exception as e:
+                update_progress(f"\n❌ 予期せぬエラー: {e}\n[[DONE]]")
                 print(f'[AI] Auto-analysis error for work #{work_id}: {e}')
 
     thread = threading.Thread(target=bg_analyze, daemon=True)
@@ -317,20 +326,61 @@ def delete_work(work_id):
     return redirect(request.referrer or url_for('library'))
 
 
+# --- In-memory progress tracker ---
+analysis_progress = {}
+
+@app.route('/stream_status/<int:work_id>')
+def stream_status(work_id):
+    """SSE endpoint to stream analysis progress and thought process."""
+    def generate():
+        last_sent = ""
+        while True:
+            # Get current progress string
+            current = analysis_progress.get(work_id, "")
+            
+            # Send only if there's new content
+            if current != last_sent:
+                new_text = current[len(last_sent):]
+                last_sent = current
+                
+                # Replace newlines with <br> for simple HTML rendering
+                safe_text = new_text.replace('\n', '<br>')
+                yield f"data: {safe_text}\n\n"
+                
+            # Stop if analysis is done (marked by a special token)
+            if "[[DONE]]" in current:
+                yield "data: [[DONE]]\n\n"
+                break
+                
+            time.sleep(0.5)
+            
+    return app.response_class(generate(), mimetype='text/event-stream')
+
+
 @app.route('/analyze/<int:work_id>', methods=['POST'])
 def analyze(work_id):
-    """Run Gemini analysis on a single work."""
+    """Run Gemini analysis on a single work (Trigger endpoint)."""
     work = Work.query.get_or_404(work_id)
+    
+    # Reset progress
+    analysis_progress[work_id] = ""
+    
+    def update_progress(text):
+        analysis_progress[work_id] = analysis_progress.get(work_id, "") + text
 
     if work.url:
-        result = analyze_work(work.url, work.title)
+        result = analyze_work(work.url, work.title, progress_callback=update_progress)
     elif work.title:
-        result = analyze_title_only(work.title)
+        result = analyze_title_only(work.title, progress_callback=update_progress)
     else:
+        update_progress("[[DONE]]")
         return jsonify({'status': 'error', 'message': 'URLまたは作品名が必要です'})
 
     if 'error' in result:
+        update_progress("\n❌ エラー終了\n[[DONE]]")
         return jsonify({'status': 'error', 'message': result['error']})
+
+    update_progress("\n✅ 分析完了！データベースに保存します...\n[[DONE]]")
 
     # Update work with AI results
     work.title = result.get('title') or work.title
